@@ -1,0 +1,4 @@
+node_modules/
+*.csv
+experiments/*/summary.md
+experiments/*/summary-*.md
