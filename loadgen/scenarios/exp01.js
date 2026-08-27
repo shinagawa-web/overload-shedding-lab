@@ -29,7 +29,7 @@ function pct(sorted, p) {
 function makeRequests(ms, tracking) {
   return [{
     setupRequest(req, context) {
-      context.route = Math.random() < 0.5 ? 'sync-cpu' : 'light'
+      context.route = Math.random() < 1 / 3 ? 'sync-cpu' : 'light'
       context.start = Date.now()
       return Object.assign({}, req, {
         path: context.route === 'sync-cpu' ? `/sync-cpu?ms=${ms}` : '/light',

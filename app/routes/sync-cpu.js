@@ -3,11 +3,15 @@ const { httpLatency } = require('../metrics')
 
 const router = Router()
 
-const sharedBuf = new SharedArrayBuffer(4)
-const sharedArr = new Int32Array(sharedBuf)
+const PAYLOAD = JSON.stringify(
+  Array.from({ length: 1000 }, (_, i) => ({ id: i, name: `item-${i}`, value: 'x'.repeat(200) }))
+)
 
 function blockEventLoop(ms) {
-  Atomics.wait(sharedArr, 0, 0, ms)
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    JSON.parse(PAYLOAD)
+  }
 }
 
 router.get('/sync-cpu', (req, res) => {
