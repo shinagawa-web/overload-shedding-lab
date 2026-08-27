@@ -5,7 +5,7 @@ on:
     inputs:
       concurrency:
         description: "Load concurrency"
-        default: "50"
+        default: "10"
       duration:
         description: "Measure duration (s)"
         default: "30"
@@ -40,7 +40,7 @@ jobs:
       - name: Run load
         env:
           APP_URL: http://localhost:3000
-          CONCURRENCY: ${{ inputs.concurrency || '50' }}
+          CONCURRENCY: ${{ inputs.concurrency || '10' }}
           DURATION: ${{ inputs.duration || '30' }}
           WARMUP: ${{ inputs.warmup || '10' }}
           CSV_OUT: results-baseline.csv
@@ -76,7 +76,7 @@ jobs:
       - name: Run load
         env:
           APP_URL: http://localhost:3000
-          CONCURRENCY: ${{ inputs.concurrency || '50' }}
+          CONCURRENCY: ${{ inputs.concurrency || '10' }}
           DURATION: ${{ inputs.duration || '30' }}
           WARMUP: ${{ inputs.warmup || '10' }}
           CSV_OUT: results-shed-${{ matrix.threshold }}ms.csv
