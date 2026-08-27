@@ -21,49 +21,75 @@ function fetchCpuPercent() {
   })
 }
 
+function pct(sorted, p) {
+  if (!sorted.length) return 0
+  return sorted[Math.max(0, Math.ceil(sorted.length * p / 100) - 1)]
+}
+
+function makeRequests(ms, tracking) {
+  return [{
+    setupRequest(req, context) {
+      context.route = Math.random() < 0.5 ? 'sync-cpu' : 'light'
+      context.start = Date.now()
+      return Object.assign({}, req, {
+        path: context.route === 'sync-cpu' ? `/sync-cpu?ms=${ms}` : '/light',
+      })
+    },
+    onResponse(status, body, context) {
+      tracking[context.route].latencies.push(Date.now() - context.start)
+      if (status >= 300) tracking[context.route].non2xx++
+    },
+  }]
+}
+
+function emptyTracking() {
+  return {
+    'sync-cpu': { latencies: [], non2xx: 0 },
+    light: { latencies: [], non2xx: 0 },
+  }
+}
+
 async function runPair(ms) {
   if (WARMUP > 0) {
-    await Promise.all([
-      autocannon({ url: `${BASE}/sync-cpu?ms=${ms}`, connections: CONCURRENCY, duration: WARMUP, timeout: TIMEOUT, silent: true }),
-      autocannon({ url: `${BASE}/light`, connections: CONCURRENCY, duration: WARMUP, timeout: TIMEOUT, silent: true }),
-    ])
+    await autocannon({
+      url: BASE,
+      connections: CONCURRENCY,
+      duration: WARMUP,
+      timeout: TIMEOUT,
+      silent: true,
+      requests: makeRequests(ms, emptyTracking()),
+    })
   }
 
-  const [syncResult, lightResult] = await Promise.all([
-    autocannon({ url: `${BASE}/sync-cpu?ms=${ms}`, connections: CONCURRENCY, duration: DURATION, timeout: TIMEOUT }),
-    autocannon({ url: `${BASE}/light`, connections: CONCURRENCY, duration: DURATION, timeout: TIMEOUT }),
-  ])
+  const perRoute = emptyTracking()
+
+  await autocannon({
+    url: BASE,
+    connections: CONCURRENCY,
+    duration: DURATION,
+    timeout: TIMEOUT,
+    requests: makeRequests(ms, perRoute),
+  })
 
   const cpuPct = await fetchCpuPercent()
 
-  return [
-    {
-      label: `sync${ms}ms-synccpu`,
-      condition: 'sync-cpu',
+  return ['sync-cpu', 'light'].map(name => {
+    const { latencies, non2xx } = perRoute[name]
+    latencies.sort((a, b) => a - b)
+    return {
+      label: `sync${ms}ms-${name === 'sync-cpu' ? 'synccpu' : 'light'}`,
+      condition: name,
       concurrency: CONCURRENCY,
       knob: ms,
-      rps: syncResult.requests.average.toFixed(1),
-      p50: syncResult.latency.p50,
-      p99: syncResult.latency.p99,
-      errors: syncResult.errors,
-      timeouts: syncResult.timeouts,
-      non2xx: syncResult.non2xx,
+      rps: (latencies.length / DURATION).toFixed(1),
+      p50: pct(latencies, 50),
+      p99: pct(latencies, 99),
+      errors: 0,
+      timeouts: 0,
+      non2xx,
       cpu_pct: cpuPct,
-    },
-    {
-      label: `sync${ms}ms-light`,
-      condition: 'light',
-      concurrency: CONCURRENCY,
-      knob: ms,
-      rps: lightResult.requests.average.toFixed(1),
-      p50: lightResult.latency.p50,
-      p99: lightResult.latency.p99,
-      errors: lightResult.errors,
-      timeouts: lightResult.timeouts,
-      non2xx: lightResult.non2xx,
-      cpu_pct: cpuPct,
-    },
-  ]
+    }
+  })
 }
 
 module.exports = { syncMs, runPair }
