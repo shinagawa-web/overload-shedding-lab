@@ -6,7 +6,7 @@ const DURATION = parseInt(process.env.DURATION ?? '30', 10)
 const WARMUP = parseInt(process.env.WARMUP ?? '10', 10)
 const TIMEOUT = parseInt(process.env.REQ_TIMEOUT ?? '120', 10)
 
-const syncMs = [0, 10, 50, 200]
+const syncMs = [50, 100, 200]
 
 function fetchCpuPercent() {
   return new Promise((resolve) => {

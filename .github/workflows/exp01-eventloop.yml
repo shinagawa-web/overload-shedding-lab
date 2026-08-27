@@ -14,7 +14,7 @@ on:
         default: "10"
       shed_thresholds:
         description: "Shedding thresholds to test (comma-separated ms)"
-        default: "50,100,150"
+        default: "50,100"
   pull_request:
     paths:
       - "experiments/01-eventloop/**"
