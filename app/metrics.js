@@ -1,3 +1,4 @@
+const os = require('os')
 const { monitorEventLoopDelay } = require('perf_hooks')
 const client = require('prom-client')
 
@@ -26,12 +27,19 @@ const shedTotal = new client.Counter({
   registers: [register],
 })
 
+const loopLagP99 = new client.Gauge({
+  name: 'eventloop_lag_p99_ms',
+  help: 'Event loop delay p99 ms (last 1s window)',
+  registers: [register],
+})
+
 const h = monitorEventLoopDelay({ resolution: 20 })
 h.enable()
 
 setInterval(() => {
   const lagMs = h.percentile(99) / 1e6
   loopLag.observe(lagMs)
+  loopLagP99.set(lagMs)
   h.reset()
 }, 1000).unref()
 
@@ -49,7 +57,7 @@ setInterval(() => {
   const cur = process.cpuUsage()
   const elapsedUs = (now - prevTime) * 1000
   const usedUs = (cur.user - prevCpu.user) + (cur.system - prevCpu.system)
-  cpuPercent.set((usedUs / elapsedUs) * 100)
+  cpuPercent.set((usedUs / elapsedUs) * 100 / os.cpus().length)
   prevCpu = cur
   prevTime = now
 }, 1000).unref()

@@ -33,13 +33,18 @@ xychart-beta
   line [${syncP99.join(', ')}]
 \`\`\``
 
+function valueByKnob(data, key) {
+  return knobs.map(k => data.find(r => r.knob === k)?.[key] ?? 'n/a')
+}
+
+const lightLag = valueByKnob(lightRows, 'lag_p99')
+const syncCpu = valueByKnob(syncRows, 'cpu_pct')
+
 const table = [
-  '| sync weight | /light p99 (ms) | /sync-cpu p99 (ms) | ratio (light) |',
-  '|---|---|---|---|',
+  '| sync weight | system cpu (%) | eventloop lag p99 (ms) | /light p99 (ms) | /sync-cpu p99 (ms) |',
+  '|---|---|---|---|---|',
   ...knobs.map((k, i) => {
-    const base = +lightP99[0] || 1
-    const ratio = (+lightP99[i] / base).toFixed(1)
-    return `| ${k}ms | ${lightP99[i]} | ${syncP99[i]} | ${ratio}x |`
+    return `| ${k}ms | ${syncCpu[i]} | ${lightLag[i]} | ${lightP99[i]} | ${syncP99[i]} |`
   }),
 ].join('\n')
 

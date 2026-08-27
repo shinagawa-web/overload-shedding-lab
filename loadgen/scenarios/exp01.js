@@ -8,16 +8,20 @@ const TIMEOUT = parseInt(process.env.REQ_TIMEOUT ?? '120', 10)
 
 const syncMs = [50, 100, 200]
 
-function fetchCpuPercent() {
+function fetchMetrics() {
   return new Promise((resolve) => {
     http.get(`${BASE}/metrics`, (res) => {
       let body = ''
       res.on('data', d => { body += d })
       res.on('end', () => {
-        const m = body.match(/^process_cpu_percent\s+([\d.]+)/m)
-        resolve(m ? parseFloat(m[1]).toFixed(1) : 'n/a')
+        const cpu = body.match(/^process_cpu_percent\s+([\d.]+)/m)
+        const lag = body.match(/^eventloop_lag_p99_ms\s+([\d.]+)/m)
+        resolve({
+          cpu_pct: cpu ? parseFloat(cpu[1]).toFixed(1) : 'n/a',
+          lag_p99: lag ? parseFloat(lag[1]).toFixed(1) : 'n/a',
+        })
       })
-    }).on('error', () => resolve('n/a'))
+    }).on('error', () => resolve({ cpu_pct: 'n/a', lag_p99: 'n/a' }))
   })
 }
 
@@ -71,7 +75,7 @@ async function runPair(ms) {
     requests: makeRequests(ms, perRoute),
   })
 
-  const cpuPct = await fetchCpuPercent()
+  const { cpu_pct, lag_p99 } = await fetchMetrics()
 
   return ['sync-cpu', 'light'].map(name => {
     const { latencies, non2xx } = perRoute[name]
@@ -87,7 +91,8 @@ async function runPair(ms) {
       errors: 0,
       timeouts: 0,
       non2xx,
-      cpu_pct: cpuPct,
+      cpu_pct,
+      lag_p99,
     }
   })
 }
