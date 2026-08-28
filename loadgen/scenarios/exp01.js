@@ -66,6 +66,12 @@ async function runPair(ms) {
   }
 
   const perRoute = emptyTracking()
+  const lagSamples = []
+  const sampler = setInterval(() => {
+    fetchMetrics().then(m => {
+      if (m.lag_p99 !== 'n/a') lagSamples.push(parseFloat(m.lag_p99))
+    })
+  }, 3000)
 
   await autocannon({
     url: BASE,
@@ -75,7 +81,9 @@ async function runPair(ms) {
     requests: makeRequests(ms, perRoute),
   })
 
-  const { cpu_pct, lag_p99 } = await fetchMetrics()
+  clearInterval(sampler)
+  const { cpu_pct } = await fetchMetrics()
+  const lag_p99 = lagSamples.length ? Math.max(...lagSamples).toFixed(1) : 'n/a'
 
   return ['sync-cpu', 'light'].map(name => {
     const { latencies, non2xx } = perRoute[name]
