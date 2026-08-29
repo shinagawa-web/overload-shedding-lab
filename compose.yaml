@@ -23,3 +23,15 @@ services:
       SHED_THRESHOLD_MS: ${SHED_THRESHOLD_MS:-70}
       UV_THREADPOOL_SIZE: 4
     profiles: [shedding-only]
+
+  go-app:
+    build: ./experiments/go-queue
+    ports:
+      - "3000:3000"
+    cpus: 2.0
+    mem_limit: 512m
+    environment:
+      PORT: 3000
+      ARM: ${ARM:-a}
+      WORKER_CAP: ${WORKER_CAP:-10}
+    profiles: [go-queue]
