@@ -30,7 +30,7 @@ xychart-beta
   x-axis [${xLabels}]
   y-axis "p99 (ms)" 0 --> ${Math.max(...lightP99, ...syncP99) + 50}
   bar [${lightP99.join(', ')}]
-  bar [${syncP99.join(', ')}]
+  line [${syncP99.join(', ')}]
 \`\`\``
 
 function valueByKnob(data, key) {
@@ -55,7 +55,7 @@ const light503 = rate503(lightRows)
 const sync503 = rate503(syncRows)
 
 const tableHeader = hasShedding
-  ? '| sync weight | /sync-cpu p99 (ms) | /sync-cpu 503率 | /light p99 (ms) | /light 503率 | eventloop lag p99 (ms) |'
+  ? '| sync weight | /sync-cpu p99 (ms) | /sync-cpu 503 rate (%) | /light p99 (ms) | /light 503 rate (%) | eventloop lag p99 (ms) |'
   : '| sync weight | system cpu (%) | eventloop lag p99 (ms) | /light p99 (ms) | /sync-cpu p99 (ms) |'
 const tableSep = hasShedding
   ? '|---|---|---|---|---|---|'
@@ -78,7 +78,7 @@ Claim: p99 spikes even when CPU has headroom. The unrelated lightweight endpoint
 
 ${chart}
 
-Left bar = /light p99, Right bar = /sync-cpu p99
+Bar = /light p99, Line = /sync-cpu p99
 
 ${table}
 
