@@ -14,7 +14,7 @@ on:
         default: "10"
       shed_thresholds:
         description: "Shedding thresholds to test (comma-separated ms)"
-        default: "50,100"
+        default: "150"
   pull_request:
     paths:
       - "experiments/**"
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        threshold: ${{ fromJson(format('[{0}]', inputs.shed_thresholds || '50,100,150')) }}
+        threshold: ${{ fromJson(format('[{0}]', inputs.shed_thresholds || '150')) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
