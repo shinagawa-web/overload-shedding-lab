@@ -1,0 +1,125 @@
+name: exp01 — Event Loop Starvation
+
+on:
+  workflow_dispatch:
+    inputs:
+      concurrency:
+        description: "Load concurrency"
+        default: "10"
+      duration:
+        description: "Measure duration (s)"
+        default: "30"
+      warmup:
+        description: "Warmup duration (s)"
+        default: "10"
+      shed_thresholds:
+        description: "Shedding thresholds to test (comma-separated ms)"
+        default: "150"
+  pull_request:
+    paths:
+      - "experiments/**"
+      - "app/**"
+      - "loadgen/**"
+      - "analyze/**"
+
+jobs:
+  baseline:
+    name: "No shedding"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm install && cd app && npm install
+      - name: Start app
+        run: |
+          docker compose --profile base up -d --build
+          sleep 5
+      - name: Run load
+        env:
+          APP_URL: http://localhost:3000
+          CONCURRENCY: ${{ inputs.concurrency || '10' }}
+          DURATION: ${{ inputs.duration || '30' }}
+          WARMUP: ${{ inputs.warmup || '10' }}
+          CSV_OUT: results-baseline.csv
+        run: node loadgen/ramp.js exp01
+      - name: Plot
+        run: node analyze/plot.js results-baseline.csv >> $GITHUB_STEP_SUMMARY
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: exp01-baseline
+          path: results-baseline.csv
+      - name: Stop app
+        if: always()
+        run: docker compose --profile base down
+
+  profiling:
+    name: "V8 CPU profile (sync_ms=200)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Run profiling experiment
+        env:
+          SYNC_MS: "200"
+          LOAD_DURATION: "20"
+          CONCURRENCY: "10"
+        run: |
+          chmod +x experiments/02-profiling/run.sh
+          experiments/02-profiling/run.sh | tee profile-output.txt
+      - name: Summarize
+        run: |
+          echo '## V8 CPU Profile — blockEventLoop (sync_ms=200)' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -A 60 '\[Bottom up' profile-output.txt | head -60 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Upload profile
+        uses: actions/upload-artifact@v7
+        with:
+          name: v8-cpu-profile
+          path: |
+            app/isolate-*.log
+            profile-output.txt
+
+  with-shedding:
+    name: "Shedding threshold=${{ matrix.threshold }}ms"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        threshold: ${{ fromJson(format('[{0}]', inputs.shed_thresholds || '150')) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm install && cd app && npm install
+      - name: Start app with shedding
+        run: |
+          SHED_THRESHOLD_MS=${{ matrix.threshold }} docker compose --profile base up -d --build
+          sleep 5
+      - name: Run load
+        env:
+          APP_URL: http://localhost:3000
+          CONCURRENCY: ${{ inputs.concurrency || '10' }}
+          DURATION: ${{ inputs.duration || '30' }}
+          WARMUP: ${{ inputs.warmup || '10' }}
+          CSV_OUT: results-shed-${{ matrix.threshold }}ms.csv
+        run: node loadgen/ramp.js exp01
+      - name: Plot
+        run: |
+          echo "## Shedding threshold: ${{ matrix.threshold }}ms" >> $GITHUB_STEP_SUMMARY
+          node analyze/plot.js results-shed-${{ matrix.threshold }}ms.csv >> $GITHUB_STEP_SUMMARY
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: exp01-shed-${{ matrix.threshold }}ms
+          path: results-shed-${{ matrix.threshold }}ms.csv
+      - name: Stop app
+        if: always()
+        run: docker compose --profile base down
