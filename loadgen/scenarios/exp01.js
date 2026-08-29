@@ -88,17 +88,19 @@ async function runPair(ms) {
   return ['sync-cpu', 'light'].map(name => {
     const { latencies, non2xx } = perRoute[name]
     latencies.sort((a, b) => a - b)
+    const total = latencies.length
     return {
       label: `sync${ms}ms-${name === 'sync-cpu' ? 'synccpu' : 'light'}`,
       condition: name,
       concurrency: CONCURRENCY,
       knob: ms,
-      rps: (latencies.length / DURATION).toFixed(1),
+      rps: (total / DURATION).toFixed(1),
       p50: pct(latencies, 50),
       p99: pct(latencies, 99),
       errors: 0,
       timeouts: 0,
       non2xx,
+      total,
       cpu_pct,
       lag_p99,
     }

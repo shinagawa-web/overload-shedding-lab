@@ -40,13 +40,35 @@ function valueByKnob(data, key) {
 const lightLag = valueByKnob(lightRows, 'lag_p99')
 const syncCpu = valueByKnob(syncRows, 'cpu_pct')
 
-const table = [
-  '| sync weight | system cpu (%) | eventloop lag p99 (ms) | /light p99 (ms) | /sync-cpu p99 (ms) |',
-  '|---|---|---|---|---|',
-  ...knobs.map((k, i) => {
-    return `| ${k}ms | ${syncCpu[i]} | ${lightLag[i]} | ${lightP99[i]} | ${syncP99[i]} |`
-  }),
-].join('\n')
+function rate503(data) {
+  return knobs.map(k => {
+    const r = data.find(row => row.knob === k)
+    if (!r) return 'n/a'
+    const total = parseFloat(r.total)
+    if (!total) return 'n/a'
+    return (parseFloat(r.non2xx) / total * 100).toFixed(1) + '%'
+  })
+}
+
+const hasShedding = rows.some(r => parseFloat(r.non2xx) > 0)
+const light503 = rate503(lightRows)
+const sync503 = rate503(syncRows)
+
+const tableHeader = hasShedding
+  ? '| sync weight | /sync-cpu p99 (ms) | /sync-cpu 503率 | /light p99 (ms) | /light 503率 | eventloop lag p99 (ms) |'
+  : '| sync weight | system cpu (%) | eventloop lag p99 (ms) | /light p99 (ms) | /sync-cpu p99 (ms) |'
+const tableSep = hasShedding
+  ? '|---|---|---|---|---|---|'
+  : '|---|---|---|---|---|'
+
+const tableRows = knobs.map((k, i) => {
+  if (hasShedding) {
+    return `| ${k}ms | ${syncP99[i]} | ${sync503[i]} | ${lightP99[i]} | ${light503[i]} | ${lightLag[i]} |`
+  }
+  return `| ${k}ms | ${syncCpu[i]} | ${lightLag[i]} | ${lightP99[i]} | ${syncP99[i]} |`
+})
+
+const table = [tableHeader, tableSep, ...tableRows].join('\n')
 
 const summary = `## Experiment 01 — Event Loop Starvation
 
