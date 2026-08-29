@@ -56,7 +56,7 @@ Claim: p99 spikes even when CPU has headroom. The unrelated lightweight endpoint
 
 ${chart}
 
-Left bar = /light p99, Right bar = /sync-cpu p99. x-axis is categorical (not to scale: 0, 50, 100, 200 ms).
+Left bar = /light p99, Right bar = /sync-cpu p99
 
 ${table}
 
