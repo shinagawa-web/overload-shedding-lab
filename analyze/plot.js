@@ -30,7 +30,7 @@ xychart-beta
   x-axis [${xLabels}]
   y-axis "p99 (ms)" 0 --> ${Math.max(...lightP99, ...syncP99) + 50}
   bar [${lightP99.join(', ')}]
-  line [${syncP99.join(', ')}]
+  bar [${syncP99.join(', ')}]
 \`\`\``
 
 function valueByKnob(data, key) {
@@ -56,7 +56,7 @@ Claim: p99 spikes even when CPU has headroom. The unrelated lightweight endpoint
 
 ${chart}
 
-Bar = /light p99, Line = /sync-cpu p99
+Left bar = /light p99, Right bar = /sync-cpu p99. x-axis is categorical (not to scale: 0, 50, 100, 200 ms).
 
 ${table}
 
