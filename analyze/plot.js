@@ -22,17 +22,6 @@ function p99ByKnob(data) {
 const lightP99 = p99ByKnob(lightRows)
 const syncP99 = p99ByKnob(syncRows)
 
-const xLabels = knobs.map(k => `"${k}ms"`).join(', ')
-
-const chart = `\`\`\`mermaid
-xychart-beta
-  title "p99 latency by sync weight (ms)"
-  x-axis [${xLabels}]
-  y-axis "p99 (ms)" 0 --> ${Math.max(...lightP99, ...syncP99) + 50}
-  bar [${lightP99.join(', ')}]
-  line [${syncP99.join(', ')}]
-\`\`\``
-
 function valueByKnob(data, key) {
   return knobs.map(k => data.find(r => r.knob === k)?.[key] ?? 'n/a')
 }
@@ -75,10 +64,6 @@ const summary = `## Experiment 01 — Event Loop Starvation
 Claim: p99 spikes even when CPU has headroom. The unrelated lightweight endpoint (/light) degrades too.
 
 ### Knob: sync blocking weight (${knobs.join(' / ')} ms)
-
-${chart}
-
-Bar = /light p99, Line = /sync-cpu p99
 
 ${table}
 
