@@ -14,7 +14,8 @@ cd "$WDIR"
 docker compose --profile go-queue down --remove-orphans 2>/dev/null || true
 
 echo "--- starting go-app in Docker (mem_limit=128m) ---"
-docker compose --profile go-queue up --build -d go-app
+docker compose build --no-cache go-app
+docker compose --profile go-queue up -d go-app
 
 echo "--- waiting for ready ---"
 for i in $(seq 1 30); do
@@ -28,7 +29,7 @@ CONTAINER=$(docker compose --profile go-queue ps -q go-app)
 echo "container=$CONTAINER"
 
 echo "--- collecting time series until OOM (RATE=$RATE req/s, SYNC_MS=${SYNC_MS}ms) ---"
-docker logs -f "$CONTAINER" 2>&1 | grep '^ts=' > "$RESULTS" &
+docker logs -f "$CONTAINER" 2>&1 | grep --line-buffered '^ts=' > "$RESULTS" &
 LOGS_PID=$!
 
 RATE=$RATE SYNC_MS=$SYNC_MS DURATION=$DURATION node "$WDIR/loadgen/open-loop.js" || true
