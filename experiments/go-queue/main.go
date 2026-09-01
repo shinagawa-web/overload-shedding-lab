@@ -38,15 +38,24 @@ func burnCPU(ms int) {
 }
 
 func trackGoroutines() {
+	start := time.Now()
 	for {
-		n := int64(runtime.NumGoroutine())
+		time.Sleep(1 * time.Second)
+		n := runtime.NumGoroutine()
+		cur := int64(n)
 		for {
-			cur := goroutinesPeak.Load()
-			if n <= cur || goroutinesPeak.CompareAndSwap(cur, n) {
+			old := goroutinesPeak.Load()
+			if cur <= old || goroutinesPeak.CompareAndSwap(old, cur) {
 				break
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		fmt.Fprintf(os.Stderr, "ts=%.0f goroutines=%d sys_mb=%.1f\n",
+			time.Since(start).Seconds(),
+			n,
+			float64(m.Sys)/1024/1024,
+		)
 	}
 }
 
@@ -85,6 +94,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/light", lightHandler)
 	mux.HandleFunc("/metrics", metricsHandler)
+	mux.HandleFunc("/sync-io", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(time.Duration(syncMs(r, defaultMs)) * time.Millisecond)
+		fmt.Fprint(w, `{"ok":true}`)
+	})
 
 	switch arm {
 	case "b":

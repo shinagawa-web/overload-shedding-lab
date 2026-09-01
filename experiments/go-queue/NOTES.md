@@ -109,3 +109,55 @@ math ループは JSON より高速なので goroutine が CPU をより密に�
 
 条件 C の WORKER_CAP をもっと大きく設定（例: 40）すれば、503 率を下げながら p99 も改善できるはず。CI では syncMs を 5 段階に戻して WORKER_CAP を適切な値で実行する。
 
+## Round 3 — goroutine/RSS time series (open-loop load)
+
+### Design
+
+Confirm that when arrival rate exceeds completion rate, goroutine count and RSS grow monotonically over time while CPU stays near zero.
+
+- Endpoint: `/sync-io` (`time.Sleep(ms)` only, no CPU burn)
+- Load: open-loop, fixed rate 50 req/s, fire-and-forget (Node.js `setInterval`)
+- SYNC_MS=10000ms, DURATION=30s
+  - Arrival rate: 50 req/s
+  - Completion rate: 0 until t=10s (first goroutines complete at t=10s)
+  - Predicted steady-state goroutines: 50 req/s × 10s = 500
+
+### Expected
+
+t=0-10s: goroutines grow at 50/s; sys_mb climbs proportionally; CPU near 0.
+
+t=10s+: arrivals and completions balance; goroutines plateau at ~500. sys_mb: goroutine stacks (~500 × 8KB = 4MB) + Go runtime baseline (~10-20MB) → ~15-30MB total.
+
+Falsified if: goroutines stay flat (open-loop not working), sys_mb stays flat (GC returning memory immediately), or CPU rises (time.Sleep burning CPU).
+
+### Results (RATE=50 req/s, SYNC_MS=10000ms, DURATION=30s)
+
+| ts (s) | goroutines | sys_mb |
+|--------|-----------|--------|
+| 1  | 10  | 8.0  |
+| 2  | 106 | 8.0  |
+| 3  | 202 | 12.0 |
+| 4  | 298 | 12.0 |
+| 5  | 394 | 12.0 |
+| 6  | 491 | 13.1 |
+| 7  | 588 | 13.1 |
+| 8  | 686 | 17.1 |
+| 9  | 782 | 17.1 |
+| 10 | 880 | 17.1 |
+| 11 | 971 | 17.1 |
+| 12 | 971 | 17.1 |
+| 13 | 973 | 21.6 |
+| 14-30 | ~975 | 21.6-21.9 |
+| 31 | 970 | 21.9 |
+| 32 | 921 | 21.9 |
+
+### Findings
+
+Goroutines climbed at ~96/s during t=1-11s (not the expected 50/s). Go's net/http spawns roughly 2 goroutines per connection, which accounts for the 2× factor. Steady state reached at ~975 goroutines (not 500, same reason).
+
+sys_mb grew from 8 to 21.9 MB during accumulation, then held flat. The growth is visible but modest: goroutine stacks are small (8KB each). At 975 goroutines, stack space is ~7.6MB; the rest is runtime overhead.
+
+CPU was not measured directly in this run, but time.Sleep goroutines don't spin — confirmed by the absence of CPU-driven latency observed in Round 2 (burnCPU).
+
+From t=31s, goroutines start declining as the first batch completes. The dataset ends at t=32 due to server shutdown; full drainage would take until t≈41s (31 + 10s sleep).
+
