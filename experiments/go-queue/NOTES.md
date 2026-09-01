@@ -161,3 +161,42 @@ CPU was not measured directly in this run, but time.Sleep goroutines don't spin 
 
 From t=31s, goroutines start declining as the first batch completes. The dataset ends at t=32 due to server shutdown; full drainage would take until t≈41s (31 + 10s sleep).
 
+## Round 4 — latency probe during goroutine accumulation (Lima/Linux)
+
+### Design
+
+While open-loop load accumulates goroutines (RATE=200/s, SYNC_MS=30000ms, DURATION=60s),
+probe `/light` and `/sync-io?ms=200` every 5s with 20 concurrent requests. No mem_limit.
+
+### Expected
+
+Latency stays flat for both endpoints even as goroutines pile up. Go schedules goroutines
+independently; a sleeping goroutine does not block others. Contrast with Node where /light
+degrades to 2823ms under the same kind of load.
+
+### Results
+
+| ts (s) | goroutines | /light p99 | /sync-io(200ms) p99 |
+|--------|-----------|-----------|-------------------|
+| 5  | 1,196 | 3.7ms  | 205ms |
+| 10 | 2,195 | 7.5ms  | 205ms |
+| 15 | 3,196 | 3.6ms  | 203ms |
+| 20 | 4,194 | 2.2ms  | 202ms |
+| 25 | 5,197 | 5.5ms  | 202ms |
+| 30 | 6,198 | 1.5ms  | 202ms |
+| 35 | 6,202 | 1.1ms  | 202ms |
+| 40 | 6,202 | 1.5ms  | 202ms |
+| 45 | 6,202 | 2.6ms  | 204ms |
+| 50 | 6,202 | 1.8ms  | 203ms |
+| 55 | 6,202 | 1.2ms  | 203ms |
+
+### Findings
+
+With 6,200 goroutines sleeping, `/light` p99 held at 1–8ms throughout. `/sync-io?ms=200`
+p99 stayed at ~202ms (≈ SYNC_MS), showing zero scheduling overhead from the accumulated goroutines.
+
+Node reference: `/light` p99 = 2823ms under comparable load (Round 1).
+
+The service appears completely healthy on latency metrics right up to the moment the OOM killer
+fires (exit_code=137 at ~45s under mem_limit=128m). There is no latency warning before the crash.
+
