@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,28 +12,13 @@ import (
 
 var goroutinesPeak atomic.Int64
 
-type item struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-var payload []item
-
-func init() {
-	payload = make([]item, 1000)
-	for i := range payload {
-		payload[i] = item{ID: i, Name: fmt.Sprintf("item-%d", i), Value: string(make([]byte, 200))}
-	}
-}
-
 func burnCPU(ms int) {
 	deadline := time.Now().Add(time.Duration(ms) * time.Millisecond)
+	x := 1.0
 	for time.Now().Before(deadline) {
-		b, _ := json.Marshal(payload)
-		var out []item
-		_ = json.Unmarshal(b, &out)
+		x = x*1.0000001 + 0.0000001
 	}
+	_ = x
 }
 
 func trackGoroutines() {
